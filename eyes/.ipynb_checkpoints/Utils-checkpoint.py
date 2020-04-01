@@ -1,0 +1,345 @@
+import cv2
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import random
+import time
+import os
+import shutil
+
+import tensorflow as tf
+from tensorflow.keras.models import model_from_json
+from tensorflow.keras.layers import Dense, Input, Conv2D, MaxPooling2D, GlobalMaxPooling2D, Flatten, Dropout, BatchNormalization
+from tensorflow.keras.models import Model
+from tensorflow.keras.callbacks import ModelCheckpoint
+
+class Utils:
+    
+    def __init__(self, width, height):
+        
+        self.width = width
+        self.height = height
+        self.file_number = len(os.listdir('data/training_images')) + 1
+        self.font = cv2.FONT_HERSHEY_SIMPLEX
+        
+        # Eye detector
+        self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
+        self.detect_right_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
+        self.minNeighbours = 80 # sensitivity --> lower = more sensitive
+        
+        # For Training
+        self.image_size = 70
+        self.train_path = 'data/training_images/train/'
+        self.test_path = 'data/training_images/test/'
+        self.model = None
+        self.epochs= 40
+        self.model_weights='data/model_weights.hdf5'
+        
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    
+    def draw_dots(self):
+    
+        '''
+        Function randomly draws a yellow dot on the screen for user
+        to focus on.
+        
+        Output: Co-ordiantes (x,y) of the focal point
+        '''
+
+        # Start with a black background
+        img = np.zeros((self.height, self.width, 3))
+        
+        # Print the number of files in the training folder
+        num_of_files = str(len(os.listdir(self.train_path)))
+        cv2.putText(img,
+                text=num_of_files,
+                fontFace=self.font,
+                fontScale=1, # font size
+                color=(255,255,255),
+                thickness=2,
+                org=(40,40),
+                lineType=cv2.LINE_AA)
+
+        # Generate a random coordinate
+        x = int(random.random()*self.width)
+        y = int(random.random()*self.height)
+        random_point = (x,y)
+
+        # Draw the circle at (x,y)
+        cv2.circle(img, center=random_point, radius=5, thickness=-1, color=(4, 173, 59))
+        cv2.circle(img, center=random_point, radius=10, thickness=2, color=(3, 237, 91))
+        
+        # Show the image
+        cv2.imshow('display_dots', img)
+
+        return random_point
+    
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    
+    def detect(self, image, random_point):
+    
+        '''
+        Function to detect and save user's right eye using Haar Cascades 
+        (1) Detect right eye
+        (2) Draw bounding box
+        (3) Crop eye
+        (4) Save eye image in folder (self.train_path) with the corresponding coordinates.
+        '''
+
+        # Detect. Get (x,y,w,h) coordinates for right eye
+        l_eye = self.detect_left_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
+        r_eye = self.detect_right_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
+
+        self.detect_and_save(l_eye, image, random_point)
+            
+        self.detect_and_save(r_eye, image, random_point)
+           
+        cv2.imshow('display', image)
+        
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    def detect_and_save(self, eye, image, random_point):
+        
+        if len(eye) > 0:
+            
+            x,y,w,h = eye[0]
+        
+            # Show the rectangle on the display
+            cv2.rectangle(image, (x,y), (x+w, y+h), thickness=1, color=(0,255,0))
+            
+            # Crop the image
+            crop = image[y:y+h, x:x+w]
+     
+            # Get coordinates
+            rand_x, rand_y = str(random_point[0]), str(random_point[1])
+            
+            # Save 25% of images in test, 75% in train
+            if random.randint(1,4) == 1:
+                cv2.imwrite(self.test_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.jpg', crop)
+            else:
+                cv2.imwrite(self.train_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.jpg', crop)
+                
+            self.file_number += 1
+         
+    #=========================================#
+    #=========================================#
+    #=========================================#       
+    
+    
+    def preprocess_data(self, data_type):
+        
+        '''
+        Function creates image arrays (X) and labels (Y)
+        
+        Input: String indicating whether to preprocess 'train' or 'test' data.
+        
+        Output: X, Y 
+            where X.shape=(n, width, height, depth), 
+                  Y.shape= (n, 2)
+        '''
+        
+        if data_type == 'train':
+            path = self.train_path
+        elif data_type == 'test':
+            path = self.test_path
+        else:
+            return "Invalid path"
+            
+        n_images = len(os.listdir(path))
+
+        X = np.zeros((n_images, self.image_size, self.image_size, 1))
+        Y = np.zeros((n_images,2),dtype=np.int16)
+
+        for i, file in enumerate(os.listdir(path)):
+
+            img = cv2.imread(path + "/" + file)
+            img = img[:,:,0] # take the first layer of the image
+            img = cv2.resize(img, (self.image_size, self.image_size))
+            img = img.reshape(self.image_size, self.image_size,1 )
+            img = img / 255.0
+            X[i] = img
+       
+            # Get coordinates from the filename (e.g. "12_(120,340).jpg" --> (120,340))
+            file = file.split('_')
+            n1 = int(file[0])
+            n2 = int(file[1])
+            Y[i] = np.array([n1,n2])
+            
+        print(data_type,"|| X ",X.shape,"|| Y ", Y.shape)
+
+        return X, Y
+
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    
+    def init_model(self):
+        
+        '''
+        Create and save model as class attribute.
+        '''
+    
+        i = Input(shape=(self.image_size, self.image_size, 1))
+        x = Conv2D(32, (3,3), activation='relu')(i)
+        x = MaxPooling2D(2,2)(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.2)(x)
+        x = Conv2D(64, (3,3), activation='relu')(x)
+        x = MaxPooling2D(2,2)(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.2)(x)
+        x = Conv2D(128, (3,3), activation='relu')(x)
+        x = MaxPooling2D(2,2)(x)
+        x = BatchNormalization()(x)
+        x = GlobalMaxPooling2D()(x)
+        x = Dense(256, activation='relu')(x)
+        x = Dropout(0.2)(x)
+        x = Dense(2)(x) #output is a dense of size 2 (x,y)
+
+        self.model = Model(inputs=i, outputs=x)
+        print(self.model.summary())
+        
+    #=========================================#
+    #=========================================#
+    #=========================================#            
+        
+    def train_model(self, X_train, Y_train, X_test, Y_test):
+        
+        '''
+        Trains the model, and displays the train/val errors as a function of epochs.
+
+        '''
+        
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, 
+                                                         beta_1=0.9, 
+                                                         beta_2=0.999, 
+                                                         amsgrad=False),
+                      loss='mean_squared_error',
+                      metrics=['mean_squared_error'])
+        
+        checkpoint = ModelCheckpoint(self.model_weights, 
+                                     monitor='val_mean_squared_error', 
+                                     verbose=1, 
+                                     save_best_only=True, 
+                                     mode='min')
+        
+        callbacks_list = [checkpoint]
+    
+        R = self.model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=self.epochs, callbacks=callbacks_list)          
+            
+        # Show training history
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax1.set_ylabel('MSE')
+        ax1.set_xlabel('Epochs')
+        ax1.plot(R.history['val_loss'], label ='val_mean_sq_error')
+        ax1.plot(R.history['loss'], label='mean_sq_error')
+        plt.legend()
+        plt.show()
+
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    
+    def show_results(self):
+        
+        '''
+        Plots a scatter plot of the actual (x,y) coordinates against 
+        predicted (x,y) for the test set.
+        '''
+        
+        if self.model is None:
+            return "\nNo model found. Please train the model first"
+            
+        else:
+            results = []
+            for file in os.listdir(self.test_path):
+                img = cv2.imread(self.test_path + file)
+                img = img[:,:,0]
+                img = cv2.resize(img, (self.image_size, self.image_size))
+                img = img.reshape(1, self.image_size, self.image_size,1)
+                img = img/255.0
+                pred = self.model.predict(img)[0]
+
+                pred_x, pred_y = int(pred[0]), int(pred[1])
+                coord_x = int(file.split('_')[0])
+                coord_y = int(file.split('_')[1])
+                error_x = pred_x-coord_x
+                error_y = pred_y-coord_y
+                results.append([file, coord_x, error_x, coord_y, error_y])
+
+            df = pd.DataFrame(results, columns=["Filename", "actual_x", "error_x", "actual_y", "error_y"])
+            # df.to_csv("results.csv")
+ 
+            #Show results
+            fig, ax = plt.subplots()
+            ax.quiver(df['actual_x'], -df['actual_y'], df['error_x'], -df['error_y'], width=0.002)
+            ax.scatter(df['actual_x'],-df['actual_y'], color='k', s=7)
+            plt.show()
+
+    #=========================================#
+    #=========================================#
+    #=========================================#                   
+            
+    def load_model_weights(self):
+        
+        '''
+        Load model weights from eye_model.hdf5 file
+        '''
+        
+        if self.model is not None:
+            try:
+                self.model.load_weights('data/model_weights.hdf5')
+                print("\nWeights successfully loaded\n")
+            except:
+                print('''\nError loading weights into model. Check file path to the weights, 
+                          or ensure the model is compatible with the saved weights\n''')  
+        else:
+            print("\nYou need to initialize the model first\n")
+            
+
+    #=========================================#
+    #=========================================#
+    #=========================================#      
+    
+    def predict_coordinates(self,cropped_eye):
+
+        '''
+        Function takes in the image of the cropped eye, and returns
+        the predicted x and y coordinates as a tuple.
+        '''
+        if cropped_eye is not None:
+            
+            cropped_eye = cropped_eye[:,:,1]
+
+            cropped_eye = cv2.resize(cropped_eye, (self.image_size, self.image_size))
+
+            cropped_eye = cropped_eye.reshape(1, self.image_size, self.image_size,1)
+
+            cropped_eye = cropped_eye/255.0
+
+            pred = self.model.predict(cropped_eye)[0]
+
+            x_pred, y_pred = pred[0], pred[1]
+
+            return int(abs(x_pred)), int(abs(y_pred))
+        
+        return 0,0
+    
+        
+    def draw_box(self, x_pred, y_pred):
+        
+        '''
+        Takes in predicted x and y coordinates and displays a dot.
+        '''
+
+        img = np.zeros((self.height, self.width, 3))
+
+        cv2.circle(img, center=(x_pred, y_pred), radius=10, thickness=-1, color=(0,255,0))
+
+        cv2.imshow('display_dots', img)
