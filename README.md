@@ -1,5 +1,7 @@
 # Eye-power
-Controlling a cursor with your eye
+Controlling a cursor with your eye.
+1. [eye] : Regression model
+2. [eye_classifier]: 9-class classifier model
 
 ## Collecting training images
 
