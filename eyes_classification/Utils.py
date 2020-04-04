@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import random
 import time
 import os
-import shutil
-
 import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.layers import Dense, Input, Conv2D, MaxPooling2D, GlobalMaxPooling2D, Flatten, Dropout, BatchNormalization
@@ -16,24 +14,17 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 
 class Utils:
     
-    def __init__(self, width, height):
-        
-        # Screen size
-        self.width = width 
-        self.height = height
-        
-        # Inner box
-        self.inner_w = 960
-        self.inner_h = 600
-        self.offset_w = int((self.width - self.inner_w)/2)
-        self.offset_h = 50
+    def __init__(self):
         
         self.file_number = len(os.listdir('data/training_images')) + 1
         self.font = cv2.FONT_HERSHEY_SIMPLEX
+        self.previous = 0
+        self.buttons = [(45,35,200,195), (350,35,505,195), (655,35,805,195), (960,35,1110,195),
+                   (45,335,200,495), (350,335,505,495), (655,335,805,495), (960,335,1110,495),
+                   (45,635,200,795), (350,635,505,795), (655,635,805,795), (960,635,1110,795)]
         
         # Eye detector
         self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
-        self.detect_right_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
         self.minNeighbours = 120 # sensitivity --> lower = more sensitive
         
         # For Training
@@ -41,60 +32,53 @@ class Utils:
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 150
+        self.epochs= 100
         self.model_weights='data/model_weights.hdf5'
+        self.classes = 12
+
         
     #=========================================#
     #=========================================#
     #=========================================#
     
-    def draw_dots(self):
+    def draw_frames(self, Y):
     
         '''
         Function randomly draws a yellow dot on the screen for user
         to focus on.
         
         Output: Co-ordiantes (x,y) of the focal point
-        '''
-        l = 320
-        b = 200
-            
-        img = np.zeros((self.height,self.width, 3))
+        ''' 
+        img = cv2.imread('data/background.jpg')
         
         # Print the number of files in the training folder
-        num_of_files = str(len(os.listdir(self.train_path)))
+        num_of_train = str(len(os.listdir(self.train_path)))
+        num_of_test = str(len(os.listdir(self.test_path)))
+        
         cv2.putText(img,
-                text=num_of_files,
+                text= "Train: " + num_of_train + ", Test: " + num_of_test,
                 fontFace=self.font,
-                fontScale=1, # font size
+                fontScale=0.5, # font size
                 color=(255,255,255),
-                thickness=2,
-                org=(40,40),
+                thickness=1,
+                org=(40,700),
                 lineType=cv2.LINE_AA)
-        
-        buttons = [(480,50,800,250),(800,50,1120,250),(1120,50,1440,250),
-                   (480,250,800,450),(800,250,1120,450),(1120,250,1440,450),
-                   (480,450,800,650),(800,450,1120,650),(1120,450,1440,650)]
-        
-        Y = random.randint(0,len(buttons)-1)
-        print(Y)
-        for i, (a,b,c,d) in enumerate(buttons):
+                
+        for i, (a,b,c,d) in enumerate(self.buttons):
             
             if i==Y:
-                t=-1
-            else:
-                t=2
-                
-            img = cv2.rectangle(img, 
-                          pt1=(a,b), 
-                          pt2=(c,d), 
-                          thickness=t, 
-                          color=(255,255,255))
+        
+                color = (0,255,0)
+
+                img = cv2.rectangle(img, 
+                                  pt1=(a,b), 
+                                  pt2=(c,d), 
+                                  thickness=5, 
+                                  color=color)
+                break
             
         # Show the image
         cv2.imshow('display_dots', img)
-        
-        return Y
     
     #=========================================#
     #=========================================#
@@ -112,45 +96,42 @@ class Utils:
 
         # Detect. Get (x,y,w,h) coordinates for right eye
         l_eye = self.detect_left_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
-        r_eye = self.detect_right_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
 
-        self.detect_and_save(l_eye, image, Y)
-            
-        self.detect_and_save(r_eye, image, Y)
+        self.crop_and_save(l_eye, image, Y)
         
-        image = cv2.resize(image, (710,400))
+        image = cv2.resize(image, (350,200))
         
         cv2.imshow('display', image)
         
     #=========================================#
     #=========================================#
     #=========================================#
-    def detect_and_save(self, eye, image, Y):
+    def crop_and_save(self, eye, image, Y):
         
         if len(eye) > 0:
             
             x,y,w,h = eye[0]
         
-            # Show the rectangle on the display
-            cv2.rectangle(image, (x,y), (x+w, y+h), thickness=1, color=(0,255,0))
-            
             # Crop the image
             crop = image[y:y+h, x:x+w]
             
-            # Save 25% of images in test, 75% in train
-            if random.randint(1,4) == 1:
-                cv2.imwrite(self.test_path + str(Y) + '_'+ str(self.file_number) +'.jpg', crop)
+            # Save 20% of images in test
+            if random.randint(1,5) == 1:
+                cv2.imwrite(self.test_path + str(Y) + '_'+ str(self.file_number) +'.tif', crop)
             else:
-                cv2.imwrite(self.train_path + str(Y) +'_' + str(self.file_number) +'.jpg', crop)
+                cv2.imwrite(self.train_path + str(Y) +'_' + str(self.file_number) +'.tif', crop)
                 
             self.file_number += 1
+            
+            # Show the rectangle on the display
+            cv2.rectangle(image, (x,y), (x+w, y+h), thickness=2, color=(0,255,0))
          
     #=========================================#
     #=========================================#
     #=========================================#       
     
     
-    def preprocess_data(self, data_type):
+    def preprocess_data(self, data_type, file_format):
         
         '''
         Function creates image arrays (X) and labels (Y)
@@ -168,26 +149,31 @@ class Utils:
             path = self.test_path
         else:
             return "Invalid path"
-            
-        n_images = len(os.listdir(path))
         
-        print('Processing data...')
+        # Select files with the chosen file_format
+        files = []
+        for file_name in os.listdir(path):
+            if file_format in file_name:
+                files.append(file_name)
         
-        X = np.zeros((n_images, self.image_size, self.image_size, 1))
-        Y = np.zeros((n_images,9),dtype=np.int16)
+        n_images = len(files)
+        
+        print('Processing data...' + str(n_images) + ' files found.')
+        
+        X = np.zeros((n_images, self.image_size, self.image_size, 3))
+        Y = np.zeros((n_images,self.classes), dtype=np.int16)
 
-        for i, file in enumerate(os.listdir(path)):
+        for i, file_name in enumerate(files):
 
-            img = cv2.imread(path + "/" + file)
-            img = img[:,:,0] # take the first layer of the image
+            img = cv2.imread(path + "/" + file_name)
             img = cv2.resize(img, (self.image_size, self.image_size))
-            img = img.reshape(self.image_size, self.image_size,1 )
-            img = img / 255.0
+            img = img.reshape(self.image_size, self.image_size, 3)
+            img = (img-127.5) / 255.0
             X[i] = img
        
-            # Get coordinates from the filename (e.g. "12_(120,340).jpg" --> (120,340))
-            file = file.split('_')
-            k = int(file[0])
+            # Get coordinates from the filename 
+            file_name = file_name.split('_')
+            k = int(file_name[0])
             Y[i,k]= 1
     
         print(data_type,"|| X ",X.shape,"|| Y ", Y.shape)
@@ -203,7 +189,7 @@ class Utils:
         Create and save model as class attribute.
         '''
     
-        i = Input(shape=(self.image_size, self.image_size, 1))
+        i = Input(shape=(self.image_size, self.image_size, 3))
         x = Conv2D(32, (3,3), activation='relu')(i)
         x = MaxPooling2D(2,2)(x)
         x = BatchNormalization()(x)
@@ -218,7 +204,7 @@ class Utils:
         x = GlobalMaxPooling2D()(x)
         x = Dense(1024, kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01), activation='relu')(x) 
         x = Dropout(0.2)(x)
-        x = Dense(9, activation='softmax')(x) #output is a dense of size 2 (x,y)
+        x = Dense(self.classes, activation='softmax')(x) #output is a dense of size 2 (x,y)
 
         self.model = Model(inputs=i, outputs=x)
         print(self.model.summary())
@@ -286,7 +272,7 @@ class Utils:
     #=========================================#
     #=========================================#      
     
-    def predict_coordinates(self,cropped_eye):
+    def get_probability(self, cropped_eye):
 
         '''
         Function takes in the image of the cropped eye, and returns
@@ -294,23 +280,18 @@ class Utils:
         '''
         if cropped_eye is not None:
             
-            cropped_eye = cropped_eye[:,:,1]
-
             cropped_eye = cv2.resize(cropped_eye, (self.image_size, self.image_size))
 
-            cropped_eye = cropped_eye.reshape(1, self.image_size, self.image_size,1)
+            cropped_eye = cropped_eye.reshape(1, self.image_size, self.image_size,3)
 
-            cropped_eye = cropped_eye/255.0
+            cropped_eye = (cropped_eye-127.5)/255.0
 
-            pred = self.model.predict(cropped_eye)[0]
+            probabilities = self.model.predict(cropped_eye)[0]
             
-            box = np.argmax(pred)
-            print('HERE: ', box)
-            prob = pred[box]
-            
-            return box, prob
+            return probabilities
         
-        return 0,0
+        return np.zeros(self.classes)
+
     
     #=========================================#
     #=========================================#
@@ -321,25 +302,20 @@ class Utils:
         '''
         Takes in predicted x and y coordinates and displays a dot.
         '''
-        img = np.zeros((self.height,self.width, 3))
-        
-        buttons = [(480,50,800,250),(800,50,1120,250),(1120,50,1440,250),
-                   (480,250,800,450),(800,250,1120,450),(1120,250,1440,450),
-                   (480,450,800,650),(800,450,1120,650),(1120,450,1440,650)]
-   
-        for i, (a,b,c,d) in enumerate(buttons):
+        img = cv2.imread('data/background.jpg')
+            
+        for i, (a,b,c,d) in enumerate(self.buttons):
             
             if i==pred:
-                t=-1
-            else:
-                t=2
-                
-            img = cv2.rectangle(img, 
-                          pt1=(a,b), 
-                          pt2=(c,d), 
-                          thickness=t, 
-                          color=(255,255,255))
 
+                img = cv2.rectangle(img, 
+                                      pt1=(a,b), 
+                                      pt2=(c,d), 
+                                      thickness=5, 
+                                      color=(0,255,0))
+                
+                break
+                
         cv2.imshow('display_dots', img)
 
 

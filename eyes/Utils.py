@@ -144,16 +144,14 @@ class Utils:
             
             # Save 25% of images in test, 75% in train
             if random.randint(1,4) == 1:
-                cv2.imwrite(self.test_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.jpg', crop)
+                cv2.imwrite(self.test_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.tif', crop)
             else:
-                cv2.imwrite(self.train_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.jpg', crop)
-                
+                cv2.imwrite(self.train_path + rand_x +'_' + rand_y + '_'+ str(self.file_number) +'.tif', crop)
             self.file_number += 1
          
     #=========================================#
     #=========================================#
     #=========================================#       
-    
     
     def preprocess_data(self, data_type):
         
@@ -173,32 +171,33 @@ class Utils:
             path = self.test_path
         else:
             return "Invalid path"
-            
-        n_images = len(os.listdir(path))
         
-        print('Processing data...')
+        # Select files with the chosen file_format
+
+        files =  os.listdir(path)
+        n_images = len(files)
         
-        X = np.zeros((n_images, self.image_size, self.image_size, 1))
+        print('Processing data...' + str(n_images) + ' files found.')
+        
+        X = np.zeros((n_images, self.image_size, self.image_size, 3))
         Y = np.zeros((n_images,2),dtype=np.int16)
 
-        for i, file in enumerate(os.listdir(path)):
-
-            img = cv2.imread(path + "/" + file)
-            img = img[:,:,0] # take the first layer of the image
+        for i, file_name in enumerate(files):
+            print(file_name)
+            img = cv2.imread(path + "/" + file_name)
             img = cv2.resize(img, (self.image_size, self.image_size))
-            img = img.reshape(self.image_size, self.image_size,1 )
-            img = img / 255.0
+            img = img.reshape(self.image_size, self.image_size,3 )
+            img = (img-127.5) / 255
             X[i] = img
        
-            # Get coordinates from the filename (e.g. "12_(120,340).jpg" --> (120,340))
-            file = file.split('_')
-            n1 = int(file[0])
-            n2 = int(file[1])
-            Y[i] = np.array([n1,n2])
-            
+            # Get coordinates from the filename 
+            file_name = file_name.split('_')
+            x,y = int(file_name[0]), int(file_name[1])
+            Y[i]= np.array([x,y])
+    
         print(data_type,"|| X ",X.shape,"|| Y ", Y.shape)
+        return X, Y    
 
-        return X, Y
 
     #=========================================#
     #=========================================#
@@ -210,7 +209,7 @@ class Utils:
         Create and save model as class attribute.
         '''
     
-        i = Input(shape=(self.image_size, self.image_size, 1))
+        i = Input(shape=(self.image_size, self.image_size, 3))
         x = Conv2D(32, (3,3), activation='relu')(i)
         x = MaxPooling2D(2,2)(x)
         x = BatchNormalization()(x)
@@ -300,10 +299,9 @@ class Utils:
             results = []
             for file in os.listdir(self.test_path):
                 img = cv2.imread(self.test_path + file)
-                img = img[:,:,0]
                 img = cv2.resize(img, (self.image_size, self.image_size))
-                img = img.reshape(1, self.image_size, self.image_size,1)
-                img = img/255.0
+                img = img.reshape(1, self.image_size, self.image_size,3)
+                img = (img-127.5)/255.0
                 pred = self.model.predict(img)[0]
 
                 pred_x, pred_y = int(pred[0]), int(pred[1])
@@ -356,14 +354,12 @@ class Utils:
         the predicted x and y coordinates as a tuple.
         '''
         if cropped_eye is not None:
-            
-            cropped_eye = cropped_eye[:,:,1]
 
             cropped_eye = cv2.resize(cropped_eye, (self.image_size, self.image_size))
 
-            cropped_eye = cropped_eye.reshape(1, self.image_size, self.image_size,1)
+            cropped_eye = cropped_eye.reshape(1, self.image_size, self.image_size,3)
 
-            cropped_eye = cropped_eye/255.0
+            cropped_eye = (cropped_eye-127.5)/255
 
             pred = self.model.predict(cropped_eye)[0]
 
@@ -384,18 +380,6 @@ class Utils:
         '''
 
         img = self.draw_outline()
-              
-#         img = self.draw_buttons(2,1,8,5,x_pred, y_pred, img, 1)
-#         img = self.draw_buttons(9,1,15,5,x_pred, y_pred, img, 1)
-#         img = self.draw_buttons(16,1,22,5,x_pred, y_pred, img, 1)
-        
-#         img = self.draw_buttons(2,5,8,9,x_pred, y_pred, img, 2)
-#         img = self.draw_buttons(9,5,15,9,x_pred, y_pred, img, 2)
-#         img = self.draw_buttons(16,5,22,9,x_pred, y_pred, img, 2)
-        
-#         img = self.draw_buttons(2,8,8,13,x_pred, y_pred, img, 3)
-#         img = self.draw_buttons(9,8,15,13,x_pred, y_pred, img, 3)
-#         img = self.draw_buttons(16,8,22,13,x_pred, y_pred, img, 3)
 
         cv2.circle(img, center=(x_pred, y_pred), radius=10, thickness=-1, color=(0,255,0))
 

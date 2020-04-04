@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from Utils import Utils
 ##
-utils = Utils(width=1920, height=1080)
+utils = Utils()
 utils.init_model()
 utils.load_model_weights()
     
@@ -12,7 +12,7 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
 r_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
 
-left_prob, right_prob, left_box, right_box = 0,0,0,0
+# left_prob = np.zeros(12)
 
 def crop_eye(eye, image):
     
@@ -38,7 +38,7 @@ while True:
     ret, frame = cap.read()
     frame = cv2.flip(frame, 1)
     
-      # Detect eyes
+    # Detect eyes
     left = l_eye.detectMultiScale(frame, minNeighbors=120)
     right = r_eye.detectMultiScale(frame, minNeighbors=120)
     
@@ -47,17 +47,15 @@ while True:
     right_img = crop_eye(right, frame)
     
     # Get prediction of coordinates from the cropped eye
-    if left_img is not None:
-        left_box, left_prob = utils.predict_coordinates(left_img)
-    if right_img is not None:
-        right_box, right_prob = utils.predict_coordinates(right_img)
-    
-    if left_prob >= right_prob:
-        pred = left_box
-    else:
-        pred = right_box
-    # Draw box and yellow dot
-    utils.draw_box(pred)
+    if left_img is not None and right_img is not None:
         
+        cv2.imshow('eye', left_img)
+        
+        left_prob = utils.get_probability(left_img)
+        
+        left_pred = np.argmax(left_prob)
+        
+        utils.draw_box(left_pred)
+
 cap.release()
 cv2.destroyAllWindows()
