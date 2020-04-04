@@ -10,6 +10,7 @@ import shutil
 import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.layers import Dense, Input, Conv2D, MaxPooling2D, GlobalMaxPooling2D, Flatten, Dropout, BatchNormalization
+from tensorflow.keras.regularizers import l2
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import ModelCheckpoint
 
@@ -17,22 +18,30 @@ class Utils:
     
     def __init__(self, width, height):
         
-        self.width = width
+        # Screen size
+        self.width = width 
         self.height = height
+        
+        # Inner box
+        self.inner_w = 960
+        self.inner_h = 600
+        self.offset_w = int((self.width - self.inner_w)/2)
+        self.offset_h = 50
+        
         self.file_number = len(os.listdir('data/training_images')) + 1
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         
         # Eye detector
         self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
         self.detect_right_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
-        self.minNeighbours = 80 # sensitivity --> lower = more sensitive
+        self.minNeighbours = 120 # sensitivity --> lower = more sensitive
         
         # For Training
         self.image_size = 70
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 40
+        self.epochs= 150
         self.model_weights='data/model_weights.hdf5'
         
     #=========================================#
@@ -47,9 +56,7 @@ class Utils:
         
         Output: Co-ordiantes (x,y) of the focal point
         '''
-
-        # Start with a black background
-        img = np.zeros((self.height, self.width, 3))
+        img = self.draw_outline()
         
         # Print the number of files in the training folder
         num_of_files = str(len(os.listdir(self.train_path)))
@@ -63,18 +70,35 @@ class Utils:
                 lineType=cv2.LINE_AA)
 
         # Generate a random coordinate
-        x = int(random.random()*self.width)
-        y = int(random.random()*self.height)
+        x = int(random.random()*self.inner_w + self.offset_w)
+        y = int(random.random()*self.inner_h + self.offset_h)
         random_point = (x,y)
 
         # Draw the circle at (x,y)
         cv2.circle(img, center=random_point, radius=5, thickness=-1, color=(4, 173, 59))
-        cv2.circle(img, center=random_point, radius=10, thickness=2, color=(3, 237, 91))
+        cv2.circle(img, center=random_point, radius=20, thickness=2, color=(3, 237, 91))
         
         # Show the image
         cv2.imshow('display_dots', img)
 
         return random_point
+    
+    #=========================================#
+    #=========================================#
+    #=========================================#
+    
+    def draw_outline(self):
+    
+
+        # Start with a black background 
+        img = np.zeros((self.height, self.width, 3))
+        
+        # Print bounding rectangle
+        img = cv2.rectangle(img, pt1=(self.offset_w, self.offset_h), pt2=(self.offset_w + self.inner_w, self.offset_h+ self.inner_h),
+                            color=(55,255,55),
+                            thickness=3)
+        
+        return img
     
     #=========================================#
     #=========================================#
@@ -97,7 +121,7 @@ class Utils:
         self.detect_and_save(l_eye, image, random_point)
             
         self.detect_and_save(r_eye, image, random_point)
-           
+        image = cv2.resize(image, (710,400))
         cv2.imshow('display', image)
         
     #=========================================#
@@ -151,7 +175,9 @@ class Utils:
             return "Invalid path"
             
         n_images = len(os.listdir(path))
-
+        
+        print('Processing data...')
+        
         X = np.zeros((n_images, self.image_size, self.image_size, 1))
         Y = np.zeros((n_images,2),dtype=np.int16)
 
@@ -197,7 +223,7 @@ class Utils:
         x = MaxPooling2D(2,2)(x)
         x = BatchNormalization()(x)
         x = GlobalMaxPooling2D()(x)
-        x = Dense(256, activation='relu')(x)
+        x = Dense(1024, kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01), activation='relu')(x) 
         x = Dropout(0.2)(x)
         x = Dense(2)(x) #output is a dense of size 2 (x,y)
 
@@ -215,7 +241,7 @@ class Utils:
 
         '''
         
-        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, 
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0008, 
                                                          beta_1=0.9, 
                                                          beta_2=0.999, 
                                                          amsgrad=False),
@@ -253,6 +279,20 @@ class Utils:
         predicted (x,y) for the test set.
         '''
         
+        def assign_color(x):
+            if x <= 30:
+                return '#000000'
+            elif x <= 60:
+                return '#140b78'
+            elif x <= 90:
+                return '#0b782f'
+            elif x <= 120:
+                return '#e0b814'
+            elif x <= 150:
+                return '#e07314'
+            else: 
+                return '#e01414'
+        
         if self.model is None:
             return "\nNo model found. Please train the model first"
             
@@ -271,15 +311,17 @@ class Utils:
                 coord_y = int(file.split('_')[1])
                 error_x = pred_x-coord_x
                 error_y = pred_y-coord_y
-                results.append([file, coord_x, error_x, coord_y, error_y])
+                err = np.sqrt(error_x**2 + error_y**2)
+                results.append([file, coord_x, error_x, coord_y, error_y, err])
 
-            df = pd.DataFrame(results, columns=["Filename", "actual_x", "error_x", "actual_y", "error_y"])
-            # df.to_csv("results.csv")
- 
+            df = pd.DataFrame(results, columns=["Filename", "actual_x", "error_x", "actual_y", "error_y", "total_error"])
+            
+            df['color'] = df['total_error'].apply(lambda x: assign_color(x))
+            
             #Show results
             fig, ax = plt.subplots()
             ax.quiver(df['actual_x'], -df['actual_y'], df['error_x'], -df['error_y'], width=0.002)
-            ax.scatter(df['actual_x'],-df['actual_y'], color='k', s=7)
+            ax.scatter(df['actual_x'],-df['actual_y'], s=7, c=df['color'].tolist()),
             plt.show()
 
     #=========================================#
@@ -331,15 +373,46 @@ class Utils:
         
         return 0,0
     
-        
+    #=========================================#
+    #=========================================#
+    #=========================================# 
+    
     def draw_box(self, x_pred, y_pred):
         
         '''
         Takes in predicted x and y coordinates and displays a dot.
         '''
 
-        img = np.zeros((self.height, self.width, 3))
+        img = self.draw_outline()
+              
+#         img = self.draw_buttons(2,1,8,5,x_pred, y_pred, img, 1)
+#         img = self.draw_buttons(9,1,15,5,x_pred, y_pred, img, 1)
+#         img = self.draw_buttons(16,1,22,5,x_pred, y_pred, img, 1)
+        
+#         img = self.draw_buttons(2,5,8,9,x_pred, y_pred, img, 2)
+#         img = self.draw_buttons(9,5,15,9,x_pred, y_pred, img, 2)
+#         img = self.draw_buttons(16,5,22,9,x_pred, y_pred, img, 2)
+        
+#         img = self.draw_buttons(2,8,8,13,x_pred, y_pred, img, 3)
+#         img = self.draw_buttons(9,8,15,13,x_pred, y_pred, img, 3)
+#         img = self.draw_buttons(16,8,22,13,x_pred, y_pred, img, 3)
 
         cv2.circle(img, center=(x_pred, y_pred), radius=10, thickness=-1, color=(0,255,0))
 
         cv2.imshow('display_dots', img)
+
+    #=========================================#
+    #=========================================#
+    #=========================================# 
+    
+    def draw_buttons(self, x, y, w, h, x_pred, y_pred, img):
+        
+        if x_pred >= x1 and x_pred <= x2 and y_pred >= y1 and y_pred <= y2:
+            
+            cv2.rectangle(img, pt1=(x, y), pt2=(x+w, y+h), color=(255,255,255), thickness=-1)
+            
+        else:
+            
+            cv2.rectangle(img, pt1=(x, y), pt2=(x+w, y+h), color=(255,0,0), thickness=2)
+            
+        return img

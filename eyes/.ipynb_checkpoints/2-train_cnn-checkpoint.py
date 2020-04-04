@@ -14,7 +14,7 @@ def show_distribution(data):
     ax1 = fig.add_subplot(111)
     ax1.set_ylabel('Y-coord')
     ax1.set_xlabel('X-coord')
-    ax1.scatter(data[:,0],data[:,1])
+    ax1.scatter(data[:,0],-data[:,1])
     plt.legend()
     plt.show()
 

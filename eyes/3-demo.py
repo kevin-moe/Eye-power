@@ -7,7 +7,8 @@ utils.init_model()
 utils.load_model_weights()
     
 cap = cv2.VideoCapture(1)
-
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
 r_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
 
@@ -37,9 +38,9 @@ while True:
     ret, frame = cap.read()
     frame = cv2.flip(frame, 1)
     
-    # Detect eyes
-    left = l_eye.detectMultiScale(frame, minNeighbors=35)
-    right = r_eye.detectMultiScale(frame, minNeighbors=35)
+      # Detect eyes
+    left = l_eye.detectMultiScale(frame, minNeighbors=120)
+    right = r_eye.detectMultiScale(frame, minNeighbors=120)
     
     # Crop images
     left_img = crop_eye(left, frame)
