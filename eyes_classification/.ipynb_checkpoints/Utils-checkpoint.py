@@ -25,6 +25,7 @@ class Utils:
         
         # Eye detector
         self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
+        self.detect_right_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
         self.minNeighbours = 120 # sensitivity --> lower = more sensitive
         
         # For Training
@@ -32,9 +33,13 @@ class Utils:
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 100
+        self.epochs= 50
         self.model_weights='data/model_weights.hdf5'
         self.classes = 12
+        
+        # For tracking
+        self.target_tracker = [-1,-1,-2]
+        self.preds = []
 
         
     #=========================================#
@@ -61,7 +66,7 @@ class Utils:
                 fontScale=0.5, # font size
                 color=(255,255,255),
                 thickness=1,
-                org=(40,700),
+                org=(50,25),
                 lineType=cv2.LINE_AA)
                 
         for i, (a,b,c,d) in enumerate(self.buttons):
@@ -96,8 +101,10 @@ class Utils:
 
         # Detect. Get (x,y,w,h) coordinates for right eye
         l_eye = self.detect_left_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
-
+        r_eye = self.detect_right_eye.detectMultiScale(image, minNeighbors=self.minNeighbours)
+        
         self.crop_and_save(l_eye, image, Y)
+        self.crop_and_save(r_eye, image, Y)
         
         image = cv2.resize(image, (350,200))
         
@@ -124,7 +131,7 @@ class Utils:
             self.file_number += 1
             
             # Show the rectangle on the display
-            cv2.rectangle(image, (x,y), (x+w, y+h), thickness=2, color=(0,255,0))
+            cv2.rectangle(image, (x,y), (x+w, y+h), thickness=3, color=(0,255,0))
          
     #=========================================#
     #=========================================#
@@ -302,20 +309,26 @@ class Utils:
         '''
         Takes in predicted x and y coordinates and displays a dot.
         '''
+        
+        #self.preds.append(pred)
+        #seq = ' '.join([str(x) for x in self.preds])
+        
         img = cv2.imread('data/background.jpg')
-            
+#         img = cv2.putText(img,
+#                 text= seq,
+#                 fontFace=self.font,
+#                 fontScale=1, # font size
+#                 color=(255,255,255),
+#                 thickness=1,
+#                 org=(50,50),
+#                 lineType=cv2.LINE_AA)
+        
         for i, (a,b,c,d) in enumerate(self.buttons):
-            
+
             if i==pred:
 
-                img = cv2.rectangle(img, 
-                                      pt1=(a,b), 
-                                      pt2=(c,d), 
-                                      thickness=5, 
-                                      color=(0,255,0))
-                
-                break
-                
+                img = cv2.rectangle(img, pt1=(a,b), pt2=(c,d), thickness=5, color=(0,255,0))
+
         cv2.imshow('display_dots', img)
 
 

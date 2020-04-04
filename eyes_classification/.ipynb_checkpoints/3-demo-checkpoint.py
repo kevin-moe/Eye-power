@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 from Utils import Utils
 ##
 utils = Utils()
@@ -12,7 +13,8 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
 r_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
 
-# left_prob = np.zeros(12)
+# ============================================#
+# ============================================#
 
 def crop_eye(eye, image):
     
@@ -29,6 +31,10 @@ def crop_eye(eye, image):
         
     return cropped_eye
 
+# ============================================#
+# ============================================#
+
+target_tracker = [-2,-1,-1]
 
 while True:
 
@@ -52,10 +58,21 @@ while True:
         cv2.imshow('eye', left_img)
         
         left_prob = utils.get_probability(left_img)
+        right_prob = utils.get_probability(right_img)
         
-        left_pred = np.argmax(left_prob)
+        prob = (left_prob + right_prob) /2
         
-        utils.draw_box(left_pred)
-
+        pred = np.argmax(prob)
+        
+        target_tracker.append(pred)
+    
+        # 3 time-step consensus
+        if target_tracker[-1] == target_tracker[-2] and target_tracker[-2] == target_tracker[-3]:
+            
+            utils.draw_box(pred)
+     
+            # Reset target tracker
+            target_tracker = [-2,-1,-1]
+    
 cap.release()
 cv2.destroyAllWindows()
