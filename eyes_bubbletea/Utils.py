@@ -16,7 +16,7 @@ class Utils:
     
     def __init__(self):
         
-        self.file_number = len(os.listdir('data/training_images')) + 1
+        self.file_number = len(os.listdir('data/training_images/train')) + 1
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         self.previous = 0
         self.buttons = [(45,35,200,195), (350,35,505,195), (655,35,805,195), (960,35,1110,195),

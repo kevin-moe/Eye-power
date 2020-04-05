@@ -7,7 +7,7 @@ utils = Utils()
 utils.init_model()
 utils.load_model_weights()
     
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')

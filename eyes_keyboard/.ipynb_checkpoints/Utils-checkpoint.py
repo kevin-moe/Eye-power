@@ -147,7 +147,7 @@ class Utils:
     #=========================================#       
     
     
-    def preprocess_data(self, data_type, file_format):
+    def preprocess_data(self, data_type):
         
         '''
         Function creates image arrays (X) and labels (Y)
