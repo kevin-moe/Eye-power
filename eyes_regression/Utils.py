@@ -28,7 +28,7 @@ class Utils:
         self.offset_w = int((self.width - self.inner_w)/2)
         self.offset_h = 50
         
-        self.file_number = len(os.listdir('data/training_images')) + 1
+        self.file_number = len(os.listdir('data/training_images/train')) + 1
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         
         # Eye detector
