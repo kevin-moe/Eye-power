@@ -73,6 +73,11 @@ while True:
      
             # Reset target tracker
             target_tracker = [-2,-1,-1]
+            
+    else:
+        
+        print('Cannot detect left and right eye. Please lower detection sensitivity.')
+    
     
 cap.release()
 cv2.destroyAllWindows()

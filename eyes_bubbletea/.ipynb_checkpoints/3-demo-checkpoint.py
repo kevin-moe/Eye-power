@@ -37,7 +37,7 @@ def crop_eye(eye, image):
 target_tracker = [-2,-1,-1]
 
 while True:
-
+    
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
         
@@ -45,13 +45,13 @@ while True:
     frame = cv2.flip(frame, 1)
     
     # Detect eyes
-    left = l_eye.detectMultiScale(frame, minNeighbors=120)
-    right = r_eye.detectMultiScale(frame, minNeighbors=120)
+    left = l_eye.detectMultiScale(frame, minNeighbors=80)
+    right = r_eye.detectMultiScale(frame, minNeighbors=80)
     
     # Crop images
     left_img = crop_eye(left, frame)
     right_img = crop_eye(right, frame)
-    
+
     # Get prediction of coordinates from the cropped eye
     if left_img is not None and right_img is not None:
         
@@ -73,6 +73,10 @@ while True:
      
             # Reset target tracker
             target_tracker = [-2,-1,-1]
+            
+    else:
+        
+        print('Cannot detect left and right eye. Please lower detection sensitivity.')
     
 cap.release()
 cv2.destroyAllWindows()
