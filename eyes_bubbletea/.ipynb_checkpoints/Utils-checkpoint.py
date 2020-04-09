@@ -160,8 +160,7 @@ class Utils:
         # Select files with the chosen file_format
         files = []
         for file_name in os.listdir(path):
-            if file_format in file_name:
-                files.append(file_name)
+            files.append(file_name)
         
         n_images = len(files)
         

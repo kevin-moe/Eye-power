@@ -43,7 +43,7 @@ class Utils:
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 80
+        self.epochs= 150
         self.model_weights='data/model_weights.hdf5'
         self.classes = 38
         
@@ -169,8 +169,7 @@ class Utils:
         # Select files with the chosen file_format
         files = []
         for file_name in os.listdir(path):
-            if file_format in file_name:
-                files.append(file_name)
+            files.append(file_name)
         
         n_images = len(files)
         
@@ -320,18 +319,7 @@ class Utils:
         Takes in predicted x and y coordinates and displays a dot.
         '''
         
-        #self.preds.append(pred)
-        #seq = ' '.join([str(x) for x in self.preds])
-        
         img = cv2.imread('data/background.jpg')
-#         img = cv2.putText(img,
-#                 text= seq,
-#                 fontFace=self.font,
-#                 fontScale=1, # font size
-#                 color=(255,255,255),
-#                 thickness=1,
-#                 org=(50,50),
-#                 lineType=cv2.LINE_AA)
         
         for i, (a,b,c,d) in enumerate(self.buttons):
 
