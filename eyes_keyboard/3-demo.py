@@ -12,7 +12,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
 r_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
-
+window =3
 # ============================================#
 # ============================================#
 
@@ -66,11 +66,11 @@ while True:
         
         target_tracker.append(pred)
     
-        # 3 time-step consensus
-        if target_tracker[-1] == target_tracker[-2]:
-            
+        # if the latest entry is the same as the last k number of entries
+        if target_tracker[-1] == int(sum(target_tracker[-window:])/window):
+
             utils.draw_box(pred)
-     
+                  
             # Reset target tracker
             target_tracker = [-2,-1,-1]
             

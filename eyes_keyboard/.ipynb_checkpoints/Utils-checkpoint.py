@@ -29,9 +29,12 @@ class Utils:
                        20: 'A', 21: 'S', 22: 'D', 23: 'F', 24: 'G',
                        25: 'H', 26: 'J', 27: 'K', 28: 'L', 29: 'Z',
                        30: 'X', 31: 'C', 32: 'V', 33: 'B', 34: 'N',
-                       35: 'M', 36: 'bksp', 37: 'sp'}
+                       35: 'M', 36: 'bksp', 37: ' '}
         
         self.inv_mapping = {v: k for k, v in self.mapping.items()}
+        
+        # Init output string
+        self.text = '>> '
         
         # Eye detector
         self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
@@ -43,7 +46,7 @@ class Utils:
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 150
+        self.epochs= 55
         self.model_weights='data/model_weights.hdf5'
         self.classes = 38
         
@@ -325,7 +328,25 @@ class Utils:
 
             if i==pred:
 
-                img = cv2.rectangle(img, pt1=(a,b), pt2=(c,d), thickness=5, color=(255,0,0))
+                img = cv2.rectangle(img, pt1=(a,b), pt2=(c,d), thickness=5, color=(0,0,255))
+                
+                # Append character
+                if len(self.text) > 30:
+                    self.text = ">> "
+                elif pred != 36:
+                    self.text += self.mapping[pred]
+                else:
+                    # Backspace
+                    self.text = self.text[:-1]
+                
+                cv2.putText(img,
+                    text= self.text,
+                    fontFace=self.font,
+                    fontScale=1, # font size
+                    color=(255,255,255),
+                    thickness=2,
+                    org=(1120,900),
+                    lineType=cv2.LINE_AA)
 
         cv2.imshow('display_dots', img)
 
