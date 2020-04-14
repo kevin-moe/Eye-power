@@ -14,7 +14,7 @@ utils = Utils()
 
 # Get train sequence
 train_sequence = []
-class_size=3
+class_size = 3
 
 for i in range(38):
     temp = [i] * class_size

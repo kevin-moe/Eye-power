@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import random
 import time
 import os
+import requests
 import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.layers import Dense, Input, Conv2D, MaxPooling2D, GlobalMaxPooling2D, Flatten, Dropout, BatchNormalization
@@ -34,7 +35,7 @@ class Utils:
         self.inv_mapping = {v: k for k, v in self.mapping.items()}
         
         # Init output string
-        self.text = '>> '
+        self.text = ''
         
         # Eye detector
         self.detect_left_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
@@ -42,17 +43,20 @@ class Utils:
         self.minNeighbours = 120 # sensitivity --> lower = more sensitive
         
         # For Training
-        self.image_size = 70
+        self.image_size = 72
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 55
+        self.epochs= 50
         self.model_weights='data/model_weights.hdf5'
         self.classes = 38
         
         # For tracking
         self.target_tracker = [-1,-1,-2]
         self.preds = []
+        
+        # Get random words
+        self.words = requests.get('https://random-word-api.herokuapp.com/word?number=3').json()
 
     #=========================================#
     #=========================================#
@@ -238,23 +242,49 @@ class Utils:
         Trains the model, and displays the train/val errors as a function of epochs.
 
         '''
+        adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
+        self.model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
         
-        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, 
-                                                         beta_1=0.9, 
-                                                         beta_2=0.999, 
-                                                         amsgrad=False),
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
-        
-        checkpoint = ModelCheckpoint(self.model_weights, 
-                                     monitor='val_accuracy', 
-                                     verbose=1, 
-                                     save_best_only=True, 
-                                     mode='max')
-        
+        # Setup Image Generator
+        batch_size=64
+        steps_per_epoch =  X_train.shape[0]//batch_size
+        data_generator = tf.keras.preprocessing.image.ImageDataGenerator(width_shift_range=0.2,
+                                                                         height_shift_range=0.2,
+                                                                         rotation_range=20,
+                                                                         horizontal_flip=False)
+
+        train_generator = data_generator.flow(X_train, Y_train, batch_size = batch_size)
+
+        # Setup Checkpoint to only save the best model validation accuracy
+        filepath="best_model.hdf5"
+        checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
         callbacks_list = [checkpoint]
+        
+        R = self.model.fit_generator(train_generator, 
+                                validation_data=(X_test, Y_test),
+                                steps_per_epoch=steps_per_epoch, 
+                                verbose=0, 
+                                epochs=50, 
+                                callbacks=callbacks_list)
+        
+        ####
+        
+#         self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, 
+#                                                          beta_1=0.9, 
+#                                                          beta_2=0.999, 
+#                                                          amsgrad=False),
+#                       loss='categorical_crossentropy',
+#                       metrics=['accuracy'])
+        
+#         checkpoint = ModelCheckpoint(self.model_weights, 
+#                                      monitor='val_accuracy', 
+#                                      verbose=1, 
+#                                      save_best_only=True, 
+#                                      mode='max')
+        
+#         callbacks_list = [checkpoint]
     
-        R = self.model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=self.epochs, callbacks=callbacks_list)   
+#         R = self.model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=self.epochs, callbacks=callbacks_list)   
             
         # Show training history
         fig = plt.figure()
@@ -324,6 +354,8 @@ class Utils:
         
         img = cv2.imread('data/background.jpg')
         
+
+        
         for i, (a,b,c,d) in enumerate(self.buttons):
 
             if i==pred:
@@ -332,21 +364,41 @@ class Utils:
                 
                 # Append character
                 if len(self.text) > 30:
-                    self.text = ">> "
+                    self.text = ""
                 elif pred != 36:
                     self.text += self.mapping[pred]
                 else:
                     # Backspace
                     self.text = self.text[:-1]
+                    
+                print(self.words[-1].upper(), self.text)
+                if self.words[-1].upper() == self.text.upper():
+                    print('pop')
+                    self.text = ""
+                    self.words.pop()
+                    
+                # Print actual word
+                cv2.putText(img,
+                    text= self.words[-1].upper(),
+                    fontFace=self.font,
+                    fontScale=1.5, # font size
+                    color=(3, 252, 28),
+                    thickness=3,
+                    org=(1120,870),
+                    lineType=cv2.LINE_AA)
                 
+                # Print typed text
                 cv2.putText(img,
                     text= self.text,
                     fontFace=self.font,
-                    fontScale=1, # font size
+                    fontScale=1.5, # font size
                     color=(255,255,255),
-                    thickness=2,
-                    org=(1120,900),
+                    thickness=3,
+                    org=(1120,930),
                     lineType=cv2.LINE_AA)
+                
+
+                    
 
         cv2.imshow('display_dots', img)
 

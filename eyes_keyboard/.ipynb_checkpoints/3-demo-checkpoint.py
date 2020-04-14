@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 from Utils import Utils
+
 ##
 utils = Utils()
 utils.init_model()
@@ -12,7 +13,8 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 l_eye = cv2.CascadeClassifier('data/haarcascade_left_eye.xml')
 r_eye = cv2.CascadeClassifier('data/haarcascade_right_eye.xml')
-window =3
+window = 4
+
 # ============================================#
 # ============================================#
 
@@ -52,10 +54,11 @@ while True:
     left_img = crop_eye(left, frame)
     right_img = crop_eye(right, frame)
     
+  
     # Get prediction of coordinates from the cropped eye
     if left_img is not None and right_img is not None:
         
-        cv2.imshow('eye', left_img)
+        cv2.imshow('frame', left_img)
         
         left_prob = utils.get_probability(left_img)
         right_prob = utils.get_probability(right_img)
