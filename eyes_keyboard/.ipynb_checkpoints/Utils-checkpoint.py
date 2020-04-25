@@ -48,6 +48,7 @@ class Utils:
         self.test_path = 'data/training_images/test/'
         self.model = None
         self.epochs= 50
+        self.batch_size=64
         self.model_weights='data/model_weights.hdf5'
         self.classes = 38
         
@@ -246,25 +247,25 @@ class Utils:
         self.model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
         
         # Setup Image Generator
-        batch_size=64
-        steps_per_epoch =  X_train.shape[0]//batch_size
+        steps_per_epoch =  X_train.shape[0]//self.batch_size
         data_generator = tf.keras.preprocessing.image.ImageDataGenerator(width_shift_range=0.2,
                                                                          height_shift_range=0.2,
+                                                                         zoom_range=[0.9, 1.1],
                                                                          rotation_range=20,
                                                                          horizontal_flip=False)
 
-        train_generator = data_generator.flow(X_train, Y_train, batch_size = batch_size)
+        train_generator = data_generator.flow(X_train, Y_train, batch_size = self.batch_size)
 
         # Setup Checkpoint to only save the best model validation accuracy
         filepath="best_model.hdf5"
         checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
         callbacks_list = [checkpoint]
         
-        R = self.model.fit_generator(train_generator, 
+        R = self.model.fit(train_generator, 
                                 validation_data=(X_test, Y_test),
                                 steps_per_epoch=steps_per_epoch, 
                                 verbose=0, 
-                                epochs=50, 
+                                epochs=self.epochs, 
                                 callbacks=callbacks_list)
         
         ####

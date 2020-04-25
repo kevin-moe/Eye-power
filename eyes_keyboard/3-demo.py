@@ -47,8 +47,8 @@ while True:
     frame = cv2.flip(frame, 1)
     
     # Detect eyes
-    left = l_eye.detectMultiScale(frame, minNeighbors=120)
-    right = r_eye.detectMultiScale(frame, minNeighbors=120)
+    left = l_eye.detectMultiScale(frame, minNeighbors=80)
+    right = r_eye.detectMultiScale(frame, minNeighbors=80)
     
     # Crop images
     left_img = crop_eye(left, frame)

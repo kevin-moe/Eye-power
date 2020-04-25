@@ -37,11 +37,11 @@ class Utils:
         self.minNeighbours = 120 # sensitivity --> lower = more sensitive
         
         # For Training
-        self.image_size = 70
+        self.image_size = 80
         self.train_path = 'data/training_images/train/'
         self.test_path = 'data/training_images/test/'
         self.model = None
-        self.epochs= 150
+        self.epochs= 75
         self.model_weights='data/model_weights.hdf5'
         
     #=========================================#
@@ -183,7 +183,6 @@ class Utils:
         Y = np.zeros((n_images,2),dtype=np.int16)
 
         for i, file_name in enumerate(files):
-            print(file_name)
             img = cv2.imread(path + "/" + file_name)
             img = cv2.resize(img, (self.image_size, self.image_size))
             img = img.reshape(self.image_size, self.image_size,3 )
@@ -222,7 +221,9 @@ class Utils:
         x = MaxPooling2D(2,2)(x)
         x = BatchNormalization()(x)
         x = GlobalMaxPooling2D()(x)
-        x = Dense(1024, kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01), activation='relu')(x) 
+        x = Dense(1024, kernel_regularizer=l2(0.01), 
+                  bias_regularizer=l2(0.01), 
+                  activation='relu')(x) 
         x = Dropout(0.2)(x)
         x = Dense(2)(x) #output is a dense of size 2 (x,y)
 
@@ -240,7 +241,7 @@ class Utils:
 
         '''
         
-        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0008, 
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, 
                                                          beta_1=0.9, 
                                                          beta_2=0.999, 
                                                          amsgrad=False),
